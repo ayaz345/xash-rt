@@ -18,16 +18,13 @@ class Subproject:
 		self.fnFilter = fnFilter
 
 	def is_exists(self, ctx):
-		return ctx.path.find_node(self.name + '/wscript')
+		return ctx.path.find_node(f'{self.name}/wscript')
 
 	def is_enabled(self, ctx):
 		if not self.is_exists(ctx):
 			return False
 
-		if self.fnFilter:
-			return self.fnFilter(ctx)
-
-		return True
+		return self.fnFilter(ctx) if self.fnFilter else True
 
 SUBDIRS = [
 	# always configured and built
@@ -316,8 +313,8 @@ def configure(conf):
 
 	# set _FILE_OFFSET_BITS=64 for filesystems with 64-bit inodes
 	if conf.env.DEST_OS != 'win32' and conf.env.DEST_SIZEOF_VOID_P == 4:
-		# check was borrowed from libarchive source code
-		file_offset_bits_usable = conf.check_cc(fragment='''
+		if file_offset_bits_usable := conf.check_cc(
+			fragment='''
 #define _FILE_OFFSET_BITS 64
 #include <sys/types.h>
 #define KB ((off_t)1024)
@@ -327,10 +324,12 @@ def configure(conf):
 int t2[(((64 * GB -1) % 671088649) == 268434537)
        && (((TB - (64 * GB -1) + 255) % 1792151290) == 305159546)? 1: -1];
 int main(void) { return 0; }''',
-		msg='Checking if _FILE_OFFSET_BITS can be defined to 64', mandatory=False)
-		if file_offset_bits_usable:
+			msg='Checking if _FILE_OFFSET_BITS can be defined to 64',
+			mandatory=False,
+		):
 			conf.define('_FILE_OFFSET_BITS', 64)
-		else: conf.undefine('_FILE_OFFSET_BITS')
+		else:
+			conf.undefine('_FILE_OFFSET_BITS')
 
 	if conf.env.DEST_OS != 'win32':
 		strcasestr_frag = '''#include <string.h>
@@ -350,10 +349,10 @@ int main(int argc, char **argv) { strcasestr(argv[1], argv[2]); return 0; }'''
 
 	# indicate if we are packaging for Linux/BSD
 	if conf.options.PACKAGING:
-		conf.env.LIBDIR = conf.env.BINDIR = conf.env.LIBDIR + '/xash3d'
+		conf.env.LIBDIR = conf.env.BINDIR = f'{conf.env.LIBDIR}/xash3d'
 		conf.env.SHAREDIR = '${PREFIX}/share/xash3d'
 	else:
-		if sys.platform != 'win32' and not conf.env.DEST_OS == 'android':
+		if sys.platform != 'win32' and conf.env.DEST_OS != 'android':
 			conf.env.PREFIX = '/'
 
 		conf.env.SHAREDIR = conf.env.LIBDIR = conf.env.BINDIR = conf.env.PREFIX
@@ -380,9 +379,12 @@ int main(void){ return !opus_custom_encoder_init(0, 0, 0); }''', fatal = False):
 
 def build(bld):
 	# don't clean QtCreator files and reconfigure saved options
-	bld.clean_files = bld.bldnode.ant_glob('**',
-		excl='*.user configuration.py .lock* *conf_check_*/** config.log %s/*' % Build.CACHE_DIR,
-		quiet=True, generator=True)
+	bld.clean_files = bld.bldnode.ant_glob(
+		'**',
+		excl=f'*.user configuration.py .lock* *conf_check_*/** config.log {Build.CACHE_DIR}/*',
+		quiet=True,
+		generator=True,
+	)
 
 	bld.load('xshlib')
 
